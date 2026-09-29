@@ -42,6 +42,19 @@ BROWSER_UA = (
 )
 
 
+IPHONE_UA = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+)
+
+
+def _meta(html: str) -> dict:
+    return {
+        k: v for k, v in re.findall(
+            r'<meta[^>]+(?:property|name)="([^"]+)"[^>]+content="([^"]*)"', html)
+    }
+
+
 def _find_music(obj):
     """Depth-first search for the TikTok sound dict (has playUrl + title)."""
     if isinstance(obj, dict):
@@ -80,11 +93,18 @@ def _convert_tiktok_sound(page_url: str, html: str, out_dir: Path) -> Path:
     data = json.loads(m.group(1))
     music = _find_music(data)
     if not music:
+        meta = _meta(html)
+        audio = meta.get("og:audio:secure_url") or meta.get("og:audio")
+        if audio and meta.get("og:title"):
+            music = {"playUrl": audio, "title": meta["og:title"], "authorName": None}
+    if not music:
         detail = ""
         if os.environ.get("A2S_DEBUG"):
             scope = data.get("__DEFAULT_SCOPE__", data)
-            skip = {k: v for k, v in scope.items() if k != "webapp.app-context"}
-            detail = f"scopes={list(scope)}; " + "; ".join(_key_paths(skip))[:3000]
+            ctx = scope.get("webapp.app-context", {})
+            detail = (f"len={len(html)} botType={ctx.get('botType')} scopes={list(scope)} "
+                      f"ldjson={'application/ld+json' in html} "
+                      f"meta={ {k: v[:80] for k, v in _meta(html).items()} }")
         raise ConversionError(f"Could not find the audio URL on the TikTok sound page. {detail}")
     play_url = music["playUrl"]
     if not play_url.startswith("https://"):
@@ -115,7 +135,8 @@ def convert(url: str, out_dir: Path | None = None) -> Path:
     out_dir = Path(out_dir or tempfile.mkdtemp(prefix="a2s_"))
     if "tiktok.com" in url:
         try:
-            page = requests.get(url, headers={"User-Agent": BROWSER_UA}, timeout=30)
+            ua = IPHONE_UA if os.environ.get("A2S_MOBILE_UA") else BROWSER_UA
+            page = requests.get(url, headers={"User-Agent": ua}, timeout=30)
         except requests.RequestException as e:
             raise ConversionError(f"Could not reach TikTok: {e}") from e
         if "/music/" in page.url:
