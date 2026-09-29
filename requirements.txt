@@ -1,4 +1,5 @@
 flask>=3.0
+requests
 yt-dlp
 gunicorn
 pytest
