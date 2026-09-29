@@ -49,6 +49,39 @@ Now in YouTube/TikTok: **Share → Send to Spotify**. Also works by copying a li
 running the shortcut from the home screen or Siri (use *Get Clipboard* in place of
 Shortcut Input).
 
+## Free, no-server option: GitHub Actions
+
+No computer or extra app needed. The Shortcut triggers `.github/workflows/convert.yml`
+in this repo; GitHub converts the link and publishes the MP3 as a release named
+`latest`; the Shortcut downloads it and saves it to your Spotify folder. Takes ~1 min.
+
+**Setup**
+1. Keep this repo **private** (the MP3s land in its releases). Private repos get
+   2,000 free Actions minutes/month, roughly 1,000+ songs.
+2. Create a fine-grained token at GitHub → Settings → Developer settings → Personal
+   access tokens, limited to this repo, with **Actions: Read and write** and
+   **Contents: Read-only**.
+3. *(YouTube only, if it says "Sign in to confirm you're not a bot")* export your
+   YouTube cookies (Netscape format, e.g. the "Get cookies.txt LOCALLY" browser
+   extension) and save them as a repo secret named `YT_COOKIES`.
+4. Merge this branch to the default branch so the workflow is available there.
+
+**Shortcut** ("Send to Spotify", enabled in Share Sheet for URLs). Replace
+`OWNER/REPO` and `TOKEN`; every request also needs the headers
+`Authorization: Bearer TOKEN` and `Accept: application/vnd.github+json`.
+1. **Current Date** → format as *Custom* `yyyyMMddHHmmss` → this is the request id.
+2. **Get Contents of URL**: POST `https://api.github.com/repos/OWNER/REPO/actions/workflows/convert.yml/dispatches`,
+   body JSON: `ref` = `main` (your default branch), `inputs` = dictionary with
+   `url` = Shortcut Input and `request_id` = the request id.
+3. **Wait** 60 seconds (raise it if conversions take longer).
+4. **Get Contents of URL**: GET `https://api.github.com/repos/OWNER/REPO/releases/tags/latest`
+5. **Get Dictionary Value** `body`; **If** it isn't the request id, **Show Alert**
+   "Not ready yet, run again in a bit" and stop.
+6. **Get Dictionary Value** `assets` → **First Item** → keys `url` and `name`.
+7. **Get Contents of URL**: GET that asset `url` with header
+   `Accept: application/octet-stream` (plus the Authorization header).
+8. **Save File** with name = asset `name`, into On My iPhone › Spotify.
+
 ## Caveats
 
 - **Spotify's local-files support on iOS is limited.** Spotify's official flow is
