@@ -64,6 +64,11 @@ in this repo; GitHub converts the link and publishes the MP3 as a release named
 3. *(YouTube only, if it says "Sign in to confirm you're not a bot")* export your
    YouTube cookies (Netscape format, e.g. the "Get cookies.txt LOCALLY" browser
    extension) and save them as a repo secret named `YT_COOKIES`.
+   **Or, for YouTube via Cobalt:** if you have access to a [Cobalt](https://github.com/imputnet/cobalt)
+   API instance, set the repo *variable* `COBALT_API_URL` (e.g. `https://your-instance.example`)
+   and, if it needs one, the secret `COBALT_API_KEY`. YouTube links then go to Cobalt first
+   and fall back to yt-dlp. Cobalt's public `api.cobalt.tools` rejects requests without
+   a key (`error.api.auth.jwt.missing`), so it's the default URL but won't work keyless.
 4. Merge this branch to the default branch so the workflow is available there.
 
 **Shortcut** ("Send to Spotify", enabled in Share Sheet for URLs). Replace
