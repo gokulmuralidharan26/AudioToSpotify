@@ -56,6 +56,20 @@ def _find_music(obj):
     return None
 
 
+def _key_paths(obj, prefix="", depth=0, out=None):
+    """Structure-only summary (keys, no values) used to diagnose page layout changes."""
+    out = [] if out is None else out
+    if depth > 6 or len(out) > 150:
+        return out
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            out.append(f"{prefix}.{k}" + ("" if isinstance(v, (dict, list)) else f"<{type(v).__name__}>"))
+            _key_paths(v, f"{prefix}.{k}", depth + 1, out)
+    elif isinstance(obj, list) and obj:
+        _key_paths(obj[0], prefix + "[0]", depth + 1, out)
+    return out
+
+
 def _convert_tiktok_sound(page_url: str, html: str, out_dir: Path) -> Path:
     """yt-dlp can't extract TikTok *sound* pages, so read the audio URL from the page."""
     m = re.search(
@@ -63,9 +77,11 @@ def _convert_tiktok_sound(page_url: str, html: str, out_dir: Path) -> Path:
     )
     if not m:
         raise ConversionError("TikTok sound page had no embedded data (blocked or changed).")
-    music = _find_music(json.loads(m.group(1)))
+    data = json.loads(m.group(1))
+    music = _find_music(data)
     if not music:
-        raise ConversionError("Could not find the audio URL on the TikTok sound page.")
+        detail = "; ".join(_key_paths(data)) if os.environ.get("A2S_DEBUG") else ""
+        raise ConversionError(f"Could not find the audio URL on the TikTok sound page. {detail}")
     play_url = music["playUrl"]
     if not play_url.startswith("https://"):
         raise ConversionError("Unexpected TikTok audio URL.")
