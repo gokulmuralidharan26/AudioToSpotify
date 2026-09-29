@@ -80,7 +80,11 @@ def _convert_tiktok_sound(page_url: str, html: str, out_dir: Path) -> Path:
     data = json.loads(m.group(1))
     music = _find_music(data)
     if not music:
-        detail = "; ".join(_key_paths(data)) if os.environ.get("A2S_DEBUG") else ""
+        detail = ""
+        if os.environ.get("A2S_DEBUG"):
+            scope = data.get("__DEFAULT_SCOPE__", data)
+            skip = {k: v for k, v in scope.items() if k != "webapp.app-context"}
+            detail = f"scopes={list(scope)}; " + "; ".join(_key_paths(skip))[:3000]
         raise ConversionError(f"Could not find the audio URL on the TikTok sound page. {detail}")
     play_url = music["playUrl"]
     if not play_url.startswith("https://"):
