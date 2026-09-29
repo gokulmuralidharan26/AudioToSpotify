@@ -33,3 +33,41 @@ def test_auth(monkeypatch):
     assert c.post("/convert", json={"url": "https://youtu.be/x"}).status_code == 401
     r = c.post("/convert", json={"url": "https://evil.com"}, headers={"Authorization": "Bearer secret"})
     assert r.status_code == 400
+
+
+def test_cobalt_success(monkeypatch, tmp_path):
+    import converter
+
+    class Resp:
+        status_code = 200
+        def __init__(self, payload=None, content=b""):
+            self.payload, self.content = payload, content
+        def json(self): return self.payload
+        def raise_for_status(self): pass
+        def iter_content(self, n): yield self.content
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    monkeypatch.setenv("COBALT_API_URL", "https://cobalt.example")
+    sent = {}
+    def fake_post(url, json, headers, timeout):
+        sent.update(url=url, json=json, headers=headers)
+        return Resp({"status": "tunnel", "url": "https://cobalt.example/t/1", "filename": "a/b: song.mp3"})
+    monkeypatch.setattr(converter.requests, "post", fake_post)
+    monkeypatch.setattr(converter.requests, "get", lambda *a, **k: Resp(content=b"x" * 20000))
+    out = converter.convert("https://youtu.be/abc", tmp_path)
+    assert out.name == "b song.mp3" and out.stat().st_size == 20000
+    assert sent["json"]["downloadMode"] == "audio" and sent["url"] == "https://cobalt.example/"
+
+
+def test_cobalt_error_raises(monkeypatch, tmp_path):
+    import converter
+
+    class Resp:
+        status_code = 401
+        def json(self): return {"status": "error", "error": {"code": "error.api.auth.key.missing"}}
+
+    monkeypatch.setenv("COBALT_API_URL", "https://cobalt.example")
+    monkeypatch.setattr(converter.requests, "post", lambda *a, **k: Resp())
+    with pytest.raises(ConversionError, match="auth.key.missing"):
+        converter._convert_cobalt("https://youtu.be/abc", tmp_path)

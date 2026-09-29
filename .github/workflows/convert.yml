@@ -33,6 +33,8 @@ jobs:
         env:
           LINK: ${{ inputs.url }}
           YT_COOKIES: ${{ secrets.YT_COOKIES }}
+          COBALT_API_URL: ${{ vars.COBALT_API_URL || 'https://api.cobalt.tools' }}
+          COBALT_API_KEY: ${{ secrets.COBALT_API_KEY }}
         run: |
           if [ -n "$YT_COOKIES" ]; then
             printf '%s' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"

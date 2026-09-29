@@ -55,6 +55,47 @@ def _meta(html: str) -> dict:
     }
 
 
+def _is_youtube(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower()
+    return any(host == h or host.endswith("." + h) for h in ("youtube.com", "youtu.be"))
+
+
+def _convert_cobalt(url: str, out_dir: Path) -> Path:
+    """Ask a Cobalt API instance (COBALT_API_URL, optional COBALT_API_KEY) for an MP3."""
+    api = os.environ["COBALT_API_URL"].rstrip("/")
+    headers = {"Accept": "application/json", "Content-Type": "application/json",
+               "User-Agent": "AudioToSpotify/1.0"}
+    if os.environ.get("COBALT_API_KEY"):
+        headers["Authorization"] = f"Api-Key {os.environ['COBALT_API_KEY']}"
+    try:
+        r = requests.post(
+            api + "/",
+            json={"url": url, "downloadMode": "audio", "audioFormat": "mp3", "audioBitrate": "192"},
+            headers=headers, timeout=60,
+        )
+        data = r.json()
+    except (requests.RequestException, ValueError) as e:
+        raise ConversionError(f"Cobalt request failed: {e}") from e
+    if data.get("status") not in ("tunnel", "redirect") or not str(data.get("url", "")).startswith("https://"):
+        err = data.get("error", {})
+        code = err.get("code") if isinstance(err, dict) else err
+        raise ConversionError(f"Cobalt refused: {data.get('status')} {code} (HTTP {r.status_code})")
+    name = safe_filename(Path(data.get("filename") or "audio.mp3").stem) + ".mp3"
+    final = out_dir / name
+    try:
+        with requests.get(data["url"], headers={"User-Agent": "AudioToSpotify/1.0"},
+                          stream=True, timeout=120) as dl:
+            dl.raise_for_status()
+            with open(final, "wb") as f:
+                for chunk in dl.iter_content(1 << 16):
+                    f.write(chunk)
+    except requests.RequestException as e:
+        raise ConversionError(f"Cobalt download failed: {e}") from e
+    if final.stat().st_size < 10_000:
+        raise ConversionError("Cobalt returned an empty or truncated file.")
+    return final
+
+
 def _find_music(obj):
     """Depth-first search for the TikTok sound dict (has playUrl + title)."""
     if isinstance(obj, dict):
@@ -133,6 +174,13 @@ def convert(url: str, out_dir: Path | None = None) -> Path:
     """Download `url` and return the path of the resulting .mp3 file."""
     url = validate_url(url)
     out_dir = Path(out_dir or tempfile.mkdtemp(prefix="a2s_"))
+    cobalt_error = None
+    if _is_youtube(url) and os.environ.get("COBALT_API_URL"):
+        try:
+            return _convert_cobalt(url, out_dir)
+        except ConversionError as e:
+            cobalt_error = str(e)
+            print(f"{e}; falling back to yt-dlp")
     if "tiktok.com" in url:
         try:
             # TikTok only serves the sound data to mobile browsers (verified from GitHub's IPs).
@@ -161,7 +209,8 @@ def convert(url: str, out_dir: Path | None = None) -> Path:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except yt_dlp.utils.DownloadError as e:
-        raise ConversionError(f"Download failed: {e}") from e
+        extra = f" (Cobalt: {cobalt_error})" if cobalt_error else ""
+        raise ConversionError(f"Download failed: {e}{extra}") from e
 
     mp3 = out_dir / f"{info['id']}.mp3"
     if not mp3.exists():
