@@ -41,7 +41,8 @@ def convert(url: str, out_dir: Path | None = None) -> Path:
         "format": "bestaudio/best",
         "outtmpl": str(out_dir / "%(id)s.%(ext)s"),
         "noplaylist": True,
-        "quiet": True,
+        "quiet": not os.environ.get("A2S_DEBUG"),
+        "verbose": bool(os.environ.get("A2S_DEBUG")),
         "no_warnings": True,
         "writethumbnail": True,
         "postprocessors": [

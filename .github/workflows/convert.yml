@@ -33,6 +33,7 @@ jobs:
         env:
           LINK: ${{ inputs.url }}
           YT_COOKIES: ${{ secrets.YT_COOKIES }}
+          A2S_DEBUG: "1"
         run: |
           if [ -n "$YT_COOKIES" ]; then
             printf '%s' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
