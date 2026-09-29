@@ -1,0 +1,48 @@
+name: Convert link to MP3
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: YouTube or TikTok link
+        required: true
+      request_id:
+        description: Opaque id the iOS Shortcut uses to recognise its own result
+        required: true
+
+# One conversion at a time, so the shared "latest" release is never clobbered.
+concurrency: convert
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: denoland/setup-deno@v2 # yt-dlp needs a JS runtime for YouTube
+      - run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+          pip install -U "yt-dlp[default]"
+      - name: Convert
+        env:
+          LINK: ${{ inputs.url }}
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        run: |
+          if [ -n "$YT_COOKIES" ]; then
+            printf '%s' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
+            export A2S_COOKIES_FILE="$RUNNER_TEMP/cookies.txt"
+          fi
+          python cli.py "$LINK" out
+      - name: Publish as the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest out/*.mp3 --title latest --notes "$REQUEST_ID"

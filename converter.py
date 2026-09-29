@@ -1,4 +1,5 @@
 """Download audio from a YouTube/TikTok link and convert it to a tagged MP3."""
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -49,6 +50,8 @@ def convert(url: str, out_dir: Path | None = None) -> Path:
             {"key": "EmbedThumbnail"},
         ],
     }
+    if os.environ.get("A2S_COOKIES_FILE"):
+        opts["cookiefile"] = os.environ["A2S_COOKIES_FILE"]
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
