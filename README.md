@@ -95,5 +95,7 @@ in this repo; GitHub converts the link and publishes the MP3 as a release named
   display properly.
 - Downloading may violate YouTube/TikTok terms and copyright; use for content you're
   entitled to. Keep `yt-dlp` updated (`pip install -U yt-dlp`) — sites change often.
-- Not yet tested against live YouTube/TikTok in this repo's dev environment; unit
-  tests cover URL validation, filename sanitising and auth.
+- Tested end to end via GitHub Actions: a TikTok *sound* link (`tiktok.com/t/...`)
+  converts to a tagged MP3 and is published as the `latest` release. YouTube from
+  GitHub's servers is blocked without cookies (see setup step 3) and is untested with them.
+- Set `A2S_DEBUG=1` on the Convert step to get verbose yt-dlp / TikTok page diagnostics.

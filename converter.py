@@ -135,8 +135,8 @@ def convert(url: str, out_dir: Path | None = None) -> Path:
     out_dir = Path(out_dir or tempfile.mkdtemp(prefix="a2s_"))
     if "tiktok.com" in url:
         try:
-            ua = IPHONE_UA if os.environ.get("A2S_MOBILE_UA") else BROWSER_UA
-            page = requests.get(url, headers={"User-Agent": ua}, timeout=30)
+            # TikTok only serves the sound data to mobile browsers (verified from GitHub's IPs).
+            page = requests.get(url, headers={"User-Agent": IPHONE_UA}, timeout=30)
         except requests.RequestException as e:
             raise ConversionError(f"Could not reach TikTok: {e}") from e
         if "/music/" in page.url:
